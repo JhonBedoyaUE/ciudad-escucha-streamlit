@@ -61,7 +61,8 @@ def cargar_datos():
             dias = rng.integers(1, 41, size=mask.sum())
             df.loc[mask, 'resuelta_en'] = (df.loc[mask, 'fecha_reporte'] +
                                            pd.to_timedelta(dias, unit='D')).dt.strftime('%Y-%m-%d %H:%M:%S')
-            df['resuelta_en'] = df['resuelta_en'].fillna('')
+        # Normalizar vacíos/NaN a cadena vacía: el resto del app compara contra ""
+        df['resuelta_en'] = df['resuelta_en'].fillna('').astype(str).replace('nan', '')
         return df
     except FileNotFoundError:
         st.error("⚠️ Archivo dataset_simulado.csv no encontrado.")
@@ -133,17 +134,28 @@ df_filtrado = df.copy()
 if comuna_seleccionada != "Todas":
     df_filtrado = df_filtrado[df_filtrado['comuna'] == comuna_seleccionada]
 
-if "Todos" not in tipo_seleccionado:
-    df_filtrado = df_filtrado[df_filtrado['tipo_dano'].isin(tipo_seleccionado)]
+# Selección vacía (o "Todos") = sin filtro: mostrar todas las categorías.
+# OJO: `"Todos" not in []` es True, así que hay que comprobar la lista vacía primero.
+def _aplicar_filtro(frame, columna, seleccion):
+    if not seleccion or "Todos" in seleccion:
+        return frame
+    return frame[frame[columna].isin(seleccion)]
 
-if "Todos" not in canal_seleccionado:
-    df_filtrado = df_filtrado[df_filtrado['canal_reporte'].isin(canal_seleccionado)]
 
-if "Todos" not in estado_seleccionado:
-    df_filtrado = df_filtrado[df_filtrado['estado_gestion'].isin(estado_seleccionado)]
+df_filtrado = _aplicar_filtro(df_filtrado, 'tipo_dano', tipo_seleccionado)
+df_filtrado = _aplicar_filtro(df_filtrado, 'canal_reporte', canal_seleccionado)
+df_filtrado = _aplicar_filtro(df_filtrado, 'estado_gestion', estado_seleccionado)
 
-fecha_inicio = pd.Timestamp(fecha_rango[0])
-fecha_fin = pd.Timestamp(fecha_rango[1]) + pd.Timedelta(days=1)
+# st.date_input devuelve una tupla, o una fecha suelta si el usuario aún no
+# eligió el extremo final del rango.
+if isinstance(fecha_rango, (tuple, list)):
+    fecha_desde = fecha_rango[0]
+    fecha_hasta = fecha_rango[1] if len(fecha_rango) > 1 else fecha_rango[0]
+else:
+    fecha_desde = fecha_hasta = fecha_rango
+
+fecha_inicio = pd.Timestamp(fecha_desde)
+fecha_fin = pd.Timestamp(fecha_hasta) + pd.Timedelta(days=1)
 df_filtrado = df_filtrado[
     (df_filtrado['fecha_reporte'] >= fecha_inicio) &
     (df_filtrado['fecha_reporte'] < fecha_fin)
@@ -396,7 +408,7 @@ fig_evol.add_trace(go.Scatter(
     y=diario["cerrados_acum"],
     mode='lines+markers',
     name='Cerrados Acumulados',
-    line=dict('#1ABC9C', width=3),
+    line=dict(color='#1ABC9C', width=3),
     marker=dict(size=6),
     hovertemplate="Fecha: %{x|%d/%m}<br>Cerrados: %{y}<extra></extra>"
 ))
