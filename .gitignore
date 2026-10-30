@@ -1,0 +1,15 @@
+venv/
+__pycache__/
+*.py[cod]
+.env
+*.log
+TerriData_Dim2.txt
+TerriData_Dim2.txt.zip
+*.shp
+*.shx
+*.dbf
+*.prj
+*.cpg
+*.bpf
+app.py.bak*
+proxy_output/
